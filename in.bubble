@@ -84,7 +84,7 @@ velocity	all create ${Ta} ${seed} rot yes dist gaussian
 
 fix		1 all nvt temp ${Ta} ${Ta} 1.0
 
-dump		traj all custom 500000 bubble.lammpstrj x y c_epo c_patom[1] c_patom[2] c_patom[4]
+dump		traj all custom 500000 bubble.lammpstrj x y c_epot c_patom[1] c_patom[2] c_patom[4]
 dump_modify	traj sort id first yes pbc yes
 
 restart         5000000 bubble.*.restart
