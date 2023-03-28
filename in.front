@@ -1,0 +1,93 @@
+# Example script of liquid front propagation in glass 2d-NPT simulation
+# see C. Herrero et al. ( https://doi.org/10.48550/arXiv.2210.04775 ) for details
+
+# parameters set
+
+variable	Ti equal 0.035		# Initial glass temperature
+variable        Ta equal 0.11		# Annealing temperature
+variable	P equal 2.31052		# Pressure
+variable 	wx equal 80		# half slit size
+variable	seed equal 4115699	# RNG seed
+
+# problem setup
+
+units           lj
+atom_style      charge
+atom_modify 	map array
+
+dimension 	2
+
+pair_style      lj/polysoft 2.03
+read_data       Ti${Ti}.lmps		# initial glass config equlibrated with swap MC
+pair_coeff      1 1 1.0 1.0 2.025 1.25 0.2
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+
+# define liquid (front) and glass regions
+region		front block -${wx} +${wx} INF INF INF INF
+group		front dynamic all region front
+region 		glassL block INF -${wx} INF INF INF INF
+region		glassR block +${wx} INF INF INF INF INF
+region		glass union 2 glassL glassR
+group		glass dynamic all region glass
+
+velocity 	all create ${Ti} ${seed}
+
+timestep        0.01
+reset_timestep  0
+
+# Perform simulation
+# 1st let the system expand quickly
+
+fix             1 all npt temp ${Ta} ${Ta} 1.0 iso $P $P 1.0
+
+# track glass and front pressure
+compute		peratomf front stress/atom NULL
+compute		pf front reduce sum c_peratomf[1] c_peratomf[2]
+variable	pressf equal -(c_pf[1]+c_pf[2])/(2*2*v_wx*ly)
+
+compute         peratomg glass stress/atom NULL
+compute         pg glass reduce sum c_peratomg[1] c_peratomg[2]
+variable        pressg equal -(c_pg[1]+c_pg[2])/(2*(lx-2*v_wx)*ly)
+
+compute         tempf front temp
+compute         tempg glass temp
+
+variable	thermofreq equal logfreq2(100,18,10)
+thermo          v_thermofreq
+thermo_style    custom step temp pe ke etotal press vol v_pos v_pressf c_tempf v_pressg c_tempg
+thermo_modify   flush yes
+
+run             100000
+
+# 2nd freeze all the particles and create liquid front of size 2*wx
+
+unfix 		1
+fix		1 front nvt temp 0.8 0.8 1.0
+
+run		100000
+
+# 3rd equilibrate the liquid inside the cavity at Ta (only with md in this example)
+
+unfix		1
+fix		1 front nvt temp ${Ta} ${Ta} 1.0
+
+run		1000000
+
+# 4th study from propagation from this configuration
+unfix		1
+reset_timestep	0
+
+velocity	all create ${Ta} ${seed} rot yes dist gaussian
+
+fix		1 all npt temp ${Ta} ${Ta} 1.0 iso $P $P 1.0
+
+dump		traj all custom 500000 front.lammpstrj x y c_epo c_patom[1] c_patom[2] c_patom[4]
+dump_modify	traj sort id first yes pbc yes
+
+restart         5000000 Tm${Ta}/seed_v${seed}/front.*.restart
+
+run             10000000
+
+write_data      front.end

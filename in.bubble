@@ -1,0 +1,94 @@
+# Example script of liquid droplet propagation in glass 2d-NVT simulation
+# see C. Herrero et al. ( https://doi.org/10.48550/arXiv.2210.04775 ) for details
+
+# parameters set
+
+variable	Ti equal 0.035		# Initial glass temperature
+variable        Ta equal 0.11		# Annealing temperature
+variable	P equal 2.31052		# Pressure
+variable 	radius equal 80		# bubble radius
+variable	seed equal 4115699	# RNG seed
+
+# problem setup
+
+units           lj
+atom_style      charge
+atom_modify 	map array
+
+dimension 	2
+
+pair_style      lj/polysoft 2.03
+read_data       Ti${Ti}.lmps		# initial glass config equlibrated with swap MC
+pair_coeff      1 1 1.0 1.0 2.025 1.25 0.2
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+
+# define liquid (bubble) region
+region 		bubble sphere 0.0 0.0 0.0 ${radius} side in
+group		bubble dynamic all region bubble
+
+velocity 	all create ${Ti} ${seed}
+
+timestep        0.01
+reset_timestep  0
+
+# Perform simulation
+# 1st let the system expand quickly
+
+fix             1 all npt temp ${Ta} ${Ta} 1.0 iso $P $P 1.0
+
+# track pressure inside the bubble
+compute		peratomb bubble stress/atom NULL
+compute		pb bubble reduce sum c_peratomb[1] c_peratomb[2]
+variable	pressb equal -(c_pb[1]+c_pb[2])/(2*3.14159265359*v_radius^2)
+
+compute         tempb bubble temp
+
+variable	thermofreq equal logfreq2(100,18,10)
+thermo          v_thermofreq
+thermo_style    custom step temp pe ke etotal press vol v_pos v_pressb c_tempb
+thermo_modify   flush yes
+
+run             100000
+
+# Replicate the system
+
+replicate	3 3 1
+
+# as the system is huge, only dump original box
+variable	x0 equal -xlo
+variable 	y0 equal -ylo
+region 		originalbox block INF ${x0} INF ${y0} INF INF
+group		all0 region originalbox
+
+
+# 2nd freeze all the particles and create liquid bubble of radius R
+unfix 		1
+fix		1 bubble nvt temp 0.8 0.8 1.0
+
+run		100000
+
+# 3rd equilibrate the liquid inside the cavity at Ta (only with md in this example)
+
+unfix		1
+fix		1 bubble nvt temp ${Ta} ${Ta} 1.0
+
+run		1000000
+
+# 4th study bubble propagation from this configuration
+unfix		1
+reset_timestep	0
+
+velocity	all create ${Ta} ${seed} rot yes dist gaussian
+
+fix		1 all nvt temp ${Ta} ${Ta} 1.0
+
+dump		traj all custom 500000 front.lammpstrj x y c_epo c_patom[1] c_patom[2] c_patom[4]
+dump_modify	traj sort id first yes pbc yes
+
+restart         5000000 Tm${Ta}/seed_v${seed}/bubble.*.restart
+
+run             10000000
+
+write_data      bubble.end

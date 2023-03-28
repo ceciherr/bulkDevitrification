@@ -1,0 +1,46 @@
+# Example script of bulk devitrification 2d-NPT simulation
+# see C. Herrero et al. ( https://doi.org/10.48550/arXiv.2210.04775 ) for details
+
+# parameters set
+
+variable	Ti equal 0.035		# Initial glass temperature
+variable        Ta equal 0.11		# Annealing temperature
+variable	P equal 2.31052		# Pressure
+variable	seed equal 4115699	# RNG seed
+
+# problem setup
+
+units           lj
+atom_style      charge
+atom_modify 	map array
+
+dimension 	2
+
+pair_style      lj/polysoftmd 2.03
+read_data       Ti${Ti}.lmps		# initial glass config equlibrated with swap MC
+pair_coeff      1 1 1.0 1.0 2.025 1.25 0.2
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+
+timestep        0.01
+reset_timestep  0
+
+# perform NPT simulation with T=Ta
+
+velocity 	all create ${Ti} ${seed}
+
+fix             1 all npt temp ${Ta} ${Ta} 1.0 iso $P $P 1.0
+
+dump		traj all xyz 10000000 bulk.xyz
+dump_modify	traj sort id first yes pbc yes
+
+thermo          10000000
+thermo_style    custom step temp pe ke etotal press vol
+thermo_modify   flush yes
+
+restart         50000000 Tm${Ta}/seed_v${seed}/bulk.*.restart
+
+run             200000000
+
+write_data      bulk.end
