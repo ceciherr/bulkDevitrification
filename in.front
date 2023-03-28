@@ -83,10 +83,10 @@ velocity	all create ${Ta} ${seed} rot yes dist gaussian
 
 fix		1 all npt temp ${Ta} ${Ta} 1.0 iso $P $P 1.0
 
-dump		traj all custom 500000 front.lammpstrj x y c_epo c_patom[1] c_patom[2] c_patom[4]
+dump		traj all custom 500000 front.lammpstrj x y c_epot c_patom[1] c_patom[2] c_patom[4]
 dump_modify	traj sort id first yes pbc yes
 
-restart         5000000 Tm${Ta}/seed_v${seed}/front.*.restart
+restart         5000000 front.*.restart
 
 run             10000000
 
