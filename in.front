@@ -75,7 +75,8 @@ fix		1 front nvt temp ${Ta} ${Ta} 1.0
 
 run		1000000
 
-# 4th study from propagation from this configuration
+# 4th study front propagation from this configuration
+
 unfix		1
 reset_timestep	0
 
