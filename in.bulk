@@ -39,7 +39,7 @@ thermo          10000000
 thermo_style    custom step temp pe ke etotal press vol
 thermo_modify   flush yes
 
-restart         50000000 Tm${Ta}/seed_v${seed}/bulk.*.restart
+restart         50000000 bulk.*.restart
 
 run             200000000
 
