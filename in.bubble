@@ -56,7 +56,7 @@ run             100000
 
 replicate	3 3 1
 
-# as the system is huge, only dump original box
+# large system, only dump original box
 variable	x0 equal -xlo
 variable 	y0 equal -ylo
 region 		originalbox block INF ${x0} INF ${y0} INF INF
